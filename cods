@@ -1,0 +1,589 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  StyleSheet, 
+  Text, 
+  View, 
+  TextInput, 
+  TouchableOpacity, 
+  ScrollView, 
+  Alert, 
+  Modal 
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+export default function App() {
+  // --- STATE TANIMLAMALARI ---
+  const [waterCount, setWaterCount] = useState(0);
+  const [mood, setMood] = useState('');
+  const [weight, setWeight] = useState('');
+  const [height, setHeight] = useState('');
+  const [bmiResult, setBmiResult] = useState(null);
+  const [bmiCategory, setBmiCategory] = useState('');
+  const [exerciseRecommendation, setExerciseRecommendation] = useState('');
+  
+  // Kronometre State'leri
+  const [timer, setTimer] = useState(0);
+  const [isTimerActive, setIsTimerActive] = useState(false);
+  
+  // Günlük Notlar State'leri
+  const [notes, setNotes] = useState([]);
+  const [currentNote, setCurrentNote] = useState('');
+  
+  // Profil/Hedef Modalı State'leri
+  const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [dailyWaterGoal, setDailyWaterGoal] = useState('8'); // Varsayılan 8 bardak
+
+  // --- KRONOMETRE LOGIC ---
+  useEffect(() => {
+    let interval = null;
+    if (isTimerActive) {
+      interval = setInterval(() => {
+        setTimer((prevTime) => prevTime + 1);
+      }, 1000);
+    } else if (!isTimerActive && timer !== 0) {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerActive, timer]);
+
+  const formatTime = (timeInSeconds) => {
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = timeInSeconds % 60;
+    return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
+  const handleStartPauseTimer = () => {
+    setIsTimerActive(!isTimerActive);
+  };
+
+  const handleResetTimer = () => {
+    setIsTimerActive(false);
+    setTimer(0);
+  };
+
+  // --- SU TAKİBİ LOGIC ---
+  const incrementWater = () => {
+    const goal = parseInt(dailyWaterGoal) || 8;
+    if (waterCount + 1 >= goal) {
+      Alert.alert("Tebrikler!", "Günlük su tüketimi hedefinize ulaştınız! 🎉");
+    }
+    setWaterCount(waterCount + 1);
+  };
+
+  const resetWater = () => {
+    setWaterCount(0);
+  };
+
+  // --- BMI (VÜCUT KİTLE ENDEKSİ) VE EGZERSİZ LOGIC ---
+  const calculateBMI = () => {
+    const w = parseFloat(weight);
+    const h = parseFloat(height) / 100; // cm'yi metreye çevir
+
+    if (!w || !h || h <= 0 || w <= 0) {
+      Alert.alert("Hata", "Lütfen geçerli boy ve kilo değerleri giriniz.");
+      return;
+    }
+
+    const bmi = (w / (h * h)).toFixed(1);
+    setBmiResult(bmi);
+
+    let category = '';
+    let recommendation = '';
+
+    if (bmi < 18.5) {
+      category = 'Zayıf';
+      recommendation = 'Hafif tempolu yürüyüşler ve kas kütlesini artırmaya yönelik hafif direnç egzersizleri yapabilirsiniz. Beslenmenize dikkat etmeniz önerilir.';
+    } else if (bmi >= 18.5 && bmi < 24.9) {
+      category = 'Normal';
+      recommendation = 'Harika! Formunuzu korumak için haftada 3-4 gün 30 dakikalık kardiyo (koşu, bisiklet) ve tüm vücut egzersizleri idealdir.';
+    } else if (bmi >= 24.9 && bmi < 29.9) {
+      category = 'Fazla Kilolu';
+      recommendation = 'Yağ yakımını desteklemek için yüksek tempolu yürüyüşler, yüzme, hafif koşular veya HIIT (Yüksek Yoğunluklu Antrenman) programları uygulayabilirsiniz.';
+    } else {
+      category = 'Obez';
+      recommendation = 'Eklemlerinize aşırı yük bindirmemek adına düşük tempolu uzun yürüyüşler, tempolu yüzme ve uzman kontrolünde hafif egzersizler başlangıç için en güvenlisidir.';
+    }
+
+    setBmiCategory(category);
+    setExerciseRecommendation(recommendation);
+  };
+
+  // --- GÜNLÜK NOTLAR LOGIC ---
+  const addNote = () => {
+    if (currentNote.trim() === '') {
+      Alert.alert("Hata", "Boş bir not ekleyemezsiniz.");
+      return;
+    }
+    const newNote = {
+      id: Date.now().toString(),
+      text: currentNote,
+      date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setNotes([newNote, ...notes]);
+    setCurrentNote('');
+  };
+
+  const deleteNote = (id) => {
+    setNotes(notes.filter(note => note.id !== id));
+  };
+
+  // --- RENDERING ---
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+      {/* BAŞLIK VE PROFİL BUTONU */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.welcomeText}>Merhaba, {userName || 'Kullanıcı'} 👋</Text>
+          <Text style={styles.appTitle}>Loop Daily</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.profileButton} 
+          onPress={() => setIsProfileModalVisible(true)}
+        >
+          <MaterialCommunityIcons name="account-cog" size={28} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {/* MOD DURUMU PANELİ */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Bugün Nasıl Hissediyorsun?</Text>
+        <View style={styles.moodContainer}>
+          {['😊 Harika', '😐 Normal', '😔 Yorgun', '😡 Stresli'].map((m) => (
+            <TouchableOpacity
+              key={m}
+              style={[styles.moodButton, mood === m && styles.moodButtonSelected]}
+              onPress={() => setMood(m)}
+            >
+              <Text style={[styles.moodButtonText, mood === m && styles.moodButtonTextSelected]}>{m}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* SU TAKİP PANELİ */}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.cardTitle}>Su Takibi 💧</Text>
+          <TouchableOpacity onPress={resetWater}>
+            <Text style={styles.resetText}>Sıfırla</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.waterSubtitle}>Bugün içilen su miktarı:</Text>
+        <View style={styles.waterDisplayRow}>
+          <Text style={styles.waterCountText}>{waterCount} <Text style={styles.waterUnit}>Bardak</Text></Text>
+          <Text style={styles.waterGoalText}>/ Hedef: {dailyWaterGoal}</Text>
+        </View>
+        <TouchableOpacity style={styles.waterAddButton} onPress={incrementWater}>
+          <MaterialCommunityIcons name="water-plus" size={24} color="#fff" />
+          <Text style={styles.waterAddButtonText}>1 Bardak Ekle</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* KRONOMETRE / EGZERSİZ SÜRESİ PANELİ */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Egzersiz Süresi Kronometresi ⏱️</Text>
+        <Text style={styles.timerText}>{formatTime(timer)}</Text>
+        <View style={styles.timerButtonRow}>
+          <TouchableOpacity 
+            style={[styles.timerButton, isTimerActive ? styles.timerButtonPause : styles.timerButtonStart]} 
+            onPress={handleStartPauseTimer}
+          >
+            <Text style={styles.timerButtonText}>{isTimerActive ? 'Duraklat' : 'Başlat'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.timerButton, styles.timerButtonReset]} onPress={handleResetTimer}>
+            <Text style={styles.timerButtonText}>Sıfırla</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* BMI VE EGZERSİZ ÖNERİSİ PANELİ */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>BMI &amp; Egzersiz Önerisi 🏃‍♂️</Text>
+        <View style={styles.inputRow}>
+          <TextInput 
+            style={styles.input} 
+            placeholder="Boy (cm)" 
+            keyboardType="numeric"
+            value={height}
+            onChangeText={setHeight}
+          />
+          <TextInput 
+            style={styles.input} 
+            placeholder="Kilo (kg)" 
+            keyboardType="numeric"
+            value={weight}
+            onChangeText={setWeight}
+          />
+        </View>
+        <TouchableOpacity style={styles.calculateButton} onPress={calculateBMI}>
+          <Text style={styles.calculateButtonText}>Hesapla ve Öneri Al</Text>
+        </TouchableOpacity>
+
+        {bmiResult && (
+          <View style={styles.bmiResultContainer}>
+            <Text style={styles.bmiResultText}>Endeksiniz: <Text style={styles.bmiHighlight}>{bmiResult}</Text> ({bmiCategory})</Text>
+            <Text style={styles.exerciseRecommendationTitle}>Önerilen Aktivite:</Text>
+            <Text style={styles.exerciseRecommendationText}>{exerciseRecommendation}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* GÜNLÜK NOTLAR PANELİ */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Günlük Notlarım 📝</Text>
+        <View style={styles.noteInputRow}>
+          <TextInput 
+            style={[styles.input, { flex: 1, marginRight: 10 }]} 
+            placeholder="Notunuzu yazın..." 
+            value={currentNote}
+            onChangeText={setCurrentNote}
+          />
+          <TouchableOpacity style={styles.noteAddButton} onPress={addNote}>
+            <Text style={styles.noteAddButtonText}>Ekle</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.notesList}>
+          {notes.map((note) => (
+            <View key={note.id} style={styles.noteItem}>
+              <View style={styles.noteTextContainer}>
+                <Text style={styles.noteTime}>{note.date}</Text>
+                <Text style={styles.noteText}>{note.text}</Text>
+              </View>
+              <TouchableOpacity onPress={() => deleteNote(note.id)}>
+                <MaterialCommunityIcons name="delete-outline" size={22} color="#ff5252" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* PROFİL AYARLARI MODALI */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isProfileModalVisible}
+        onRequestClose={() => setIsProfileModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Profil ve Hedef Ayarları</Text>
+            
+            <Text style={styles.label}>İsminiz:</Text>
+            <TextInput 
+              style={[styles.input, { width: '100%', marginBottom: 15 }]} 
+              placeholder="Adınızı girin"
+              value={userName}
+              onChangeText={setUserName}
+            />
+
+            <Text style={styles.label}>Günlük Su Hedefi (Bardak):</Text>
+            <TextInput 
+              style={[styles.input, { width: '100%', marginBottom: 20 }]} 
+              placeholder="Örn: 8" 
+              keyboardType="numeric"
+              value={dailyWaterGoal}
+              onChangeText={setDailyWaterGoal}
+            />
+
+            <TouchableOpacity 
+              style={styles.modalCloseButton} 
+              onPress={() => setIsProfileModalVisible(false)}
+            >
+              <Text style={styles.modalCloseButtonText}>Kaydet ve Kapat</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+    </ScrollView>
+  );
+}
+
+// --- STYLES / TASARIM ---
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f4f6fa',
+    paddingTop: 50,
+    paddingHorizontal: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 25,
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  appTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1a1a2e',
+  },
+  profileButton: {
+    backgroundColor: '#4a00e0',
+    padding: 10,
+    borderRadius: 12,
+    elevation: 2,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a2e',
+    marginBottom: 15,
+  },
+  resetText: {
+    color: '#ff5252',
+    fontWeight: '600',
+  },
+  moodContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  moodButton: {
+    backgroundColor: '#f0f2f5',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 10,
+    width: '48%',
+    alignItems: 'center',
+  },
+  moodButtonSelected: {
+    backgroundColor: '#4a00e0',
+  },
+  moodButtonText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  moodButtonTextSelected: {
+    color: '#fff',
+  },
+  waterSubtitle: {
+    fontSize: 13,
+    color: '#888',
+    marginBottom: 5,
+  },
+  waterDisplayRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 15,
+  },
+  waterCountText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#00b4db',
+  },
+  waterUnit: {
+    fontSize: 16,
+    fontWeight: 'normal',
+    color: '#666',
+  },
+  waterGoalText: {
+    fontSize: 14,
+    color: '#888',
+    marginLeft: 5,
+  },
+  waterAddButton: {
+    backgroundColor: '#00b4db',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+  },
+  waterAddButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  timerText: {
+    fontSize: 42,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#1a1a2e',
+    marginVertical: 10,
+    fontFamily: 'Platform' === 'ios' ? 'Courier' : 'monospace',
+  },
+  timerButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  timerButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 25,
+    borderRadius: 10,
+    width: '40%',
+    alignItems: 'center',
+  },
+  timerButtonStart: {
+    backgroundColor: '#2ecc71',
+  },
+  timerButtonPause: {
+    backgroundColor: '#f39c12',
+  },
+  timerButtonReset: {
+    backgroundColor: '#95a5a6',
+  },
+  timerButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  input: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 14,
+    width: '48%',
+  },
+  calculateButton: {
+    backgroundColor: '#4a00e0',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  calculateButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  bmiResultContainer: {
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  bmiResultText: {
+    fontSize: 15,
+    color: '#333',
+    marginBottom: 10,
+  },
+  bmiHighlight: {
+    fontWeight: 'bold',
+    color: '#4a00e0',
+  },
+  exerciseRecommendationTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1a1a2e',
+    marginBottom: 4,
+  },
+  exerciseRecommendationText: {
+    fontSize: 13,
+    color: '#555',
+    lineHeight: 18,
+  },
+  noteInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  noteAddButton: {
+    backgroundColor: '#1a1a2e',
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+  },
+  noteAddButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  notesList: {
+    marginTop: 5,
+  },
+  noteItem: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#1a1a2e',
+  },
+  noteTextContainer: {
+    flex: 1,
+    marginRight: 10,
+  },
+  noteTime: {
+    fontSize: 11,
+    color: '#999',
+    marginBottom: 2,
+  },
+  noteText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 25,
+    width: '85%',
+    alignItems: 'flex-start',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a1a2e',
+    marginBottom: 20,
+    alignSelf: 'center',
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 5,
+  },
+  modalCloseButton: {
+    backgroundColor: '#4a00e0',
+    paddingVertical: 12,
+    borderRadius: 10,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  modalCloseButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+});
