@@ -86,7 +86,7 @@ Notlarınız, eklendiği saat bilgisiyle birlikte alt alta listelenir.
 
 Silmek istediğiniz notun sağ tarafında bulunan Kırmızı Çöp Kutusu ikonuna dokunarak notu kaldırabilirsiniz.
 
-GitHub proje bağlantısı
+GitHub proje bağlantısı: https://github.com/aydanurgun1-netizen/loop-daily/blob/main/README.md
 
 Kaynakça veya yararlanılan bağlantılar:https://gemini.google.com/app/f9275801027a7704?hl=tr
 https://chatgpt.com/?utm_source=google&utm_medium=paid_search&utm_campaign=GOOG_C_SEM_GBR_Core_CHT_BAU_ACQ_PER_MIX_ALL_EMEA_TR_TR_020425&c_id=22200080104&c_agid=176486813978&c_kwid=kwd-1927227100722&c_ims=&c_pms=1012786&c_nw=g&c_dvc=c&gad_source=1&gad_campaignid=22200080104&gbraid=0AAAAA-I0E5fvcQP1Na9qKOTeCFa7pUxsJ&gclid=Cj0KCQjwo_PRBhDNARIsAEcVALUyN08WDKscpu5gDRt1ipXDo0nNy--G3xRIyZEn-4p-s5eHnCHkstcaAoOzEALw_wcB
